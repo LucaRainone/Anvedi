@@ -11,7 +11,7 @@ window.Anvedi = (function () {
 	 * @param arr2
 	 * @returns {*}
 	 */
-	const mergeAndJoinChunks = (arr1, arr2) => arr1.map((v, index) => v + (arr2[index] || "")).join("");
+	const mergeAndJoinChunks = (arr1, arr2) => arr1.map((v, index) => v + (arr2[index] === undefined? "" : arr2[index])).join("");
 
 	/**
 	 * given a complex key string (i.e. "user.name") and a referer object, search the inner key inside the referer object
@@ -112,6 +112,8 @@ window.Anvedi = (function () {
 				normalizeEscapedVarOnNode(currentNode);
 			}
 		});
+		if([...matches].length === 0)
+			normalizeEscapedVarOnNode(node);
 	}
 
 
@@ -144,9 +146,30 @@ window.Anvedi = (function () {
 				updateAttribute(index, tKey, value);
 			});
 		});
+	}
 
+	function varBindingAttributeName(element, varName, vars, handlerSets) {
+		let attrKeyValue = vars[varName];
+		if(!(typeof(attrKeyValue) === 'object')) {
+			console.error("Dynamic attributes must be objects");
+			return ;
+		}
+		element.removeAttribute("{{"+varName+"}}");
 
-
+		let currentObjects = {};
+		for(let i in attrKeyValue) {
+			currentObjects[i] =attrKeyValue;
+			element.setAttribute(i, attrKeyValue[i]);
+			let fullKey = varName + "." +i;
+			handlerSets[fullKey] = handlerSets[fullKey] || [];
+			handlerSets[fullKey].push((obj, tKey, value)=> {
+				element.setAttribute(tKey, value);
+			});
+		}
+		handlerSets[varName] = handlerSets[varName] || [];
+		handlerSets[varName].push((obj, tKey, value)=> {
+			element.setAttribute(tKey, value);
+		});
 	}
 
 	/**
@@ -158,19 +181,129 @@ window.Anvedi = (function () {
 	 * @private
 	 */
 	function _varBindingElement(element, vars, handlerSets) {
+		if(element.nodeName.toLowerCase() === "template" && element.getAttribute('data-foreach')) {
+			let varName = element.getAttribute('data-foreach');
+			varName = varName.substring(2,varName.length-2);
+			handlerSets[varName] = handlerSets[varName] || [];
+			engineLists(element,extractValueFromObject(vars, varName), handlerSets[varName]);
+			return ;
+		}
 		if (element.nodeType !== Node.TEXT_NODE) {
-			for (let i = 0; i < element.attributes.length; i++) {
-				let attr = element.attributes.item(i);
-				// check if there is at least one var, avoiding to do an useless less efficient regexp
-				if (attr.value.split("{{").length > 1)
-					varBindingAttribute(attr, vars, handlerSets);
+			if(element.attributes) {
+				for (let i = 0; i < element.attributes.length; i++) {
+					let attr = element.attributes.item(i);
+					if (attr.name.match(/^{{.*?}}$/)) {
+						varBindingAttributeName(element, attr.name.substr(2, attr.name.length - 4), vars, handlerSets);
+						continue;
+					}
+					// check if there is at least one var, avoiding to do an useless less efficient regexp
+					if (attr.value.split("{{").length > 1) {
+						varBindingAttribute(attr, vars, handlerSets);
+					}
+				}
 			}
-			[...element.childNodes].forEach(node => {
-				_varBindingElement(node, vars, handlerSets)
+			let childNodes = [...element.childNodes].slice(0);
+			childNodes.forEach(node => {
+				// console.log({node,l:childNodes.length});
+				_varBindingElement(node, vars, handlerSets);
 			});
 			return;
 		}
 		varBindingTextNode(element, vars, handlerSets);
+	}
+
+	const moveNodeAt = (node,index) => {
+		console.log({node})
+		if(+index >= node.parentNode.children.length) {
+			node.parentNode.appendChild(node)
+		}else {
+			node.parentNode.insertBefore(node, node.parentNode.children[+index]);
+		}
+	}
+
+	function engineLists(template, proxiedArray, handlerSet) {
+		let varName = template.getAttribute('data-foreach-to');
+		let nodeIndexed = [];
+		const addItem = (item, index)=> {
+			let tree = template.content.cloneNode(true);
+			let data = {
+				'%index': index
+			};
+			data[varName] = item;
+			template.parentNode.insertBefore(tree, template);
+			// the fragment is totally replaced (and emptied) by its content. So for fetch the real node
+			// we have to search it in DOM. Warning a fragmetn could be composed by 2 or more siblings (TODO)
+			let newNode = template.previousElementSibling;
+			nodeIndexed[index] = newNode;
+			let anvediInstance = new Anvedi(newNode, data, varName);
+			newNode.__anvedi = {instance:anvediInstance,index};
+		}
+
+		const removeItem = (index) => {
+			let node = nodeIndexed[index];
+			node.parentNode.removeChild(node);
+			nodeIndexed.splice(index,1);
+		}
+
+		const refreshIndex = ()=> {
+			nodeIndexed.forEach((node,index)=> {
+				let data = node.__anvedi.instance.getProxy();
+				data['%index'] = index;
+			});
+		}
+
+		proxiedArray.forEach((item, index) => {
+			addItem(item, index)
+		});
+
+		handlerSet.push((obj, key, value) => {
+			if(obj === proxiedArray) {
+				switch(key) {
+					case 'push' :
+						addItem(value.args[0], proxiedArray.length);
+						break;
+					case 'unshift' :
+						addItem(value.args[0], proxiedArray.length);
+						let node = nodeIndexed.splice(nodeIndexed.length-1,1);
+						node = node[0];
+						nodeIndexed.unshift(node);
+						moveNodeAt(node, 0)
+						refreshIndex();
+						break;
+					case 'pop' :
+						removeItem(proxiedArray.length-1);
+						break;
+					case 'shift' :
+						removeItem(0);
+						refreshIndex();
+						break;
+					case 'splice' :
+						let [start, dels, ...items] = value.args;
+						if(dels > 0) {
+							for(let i = 0; i < dels; i++) {
+								removeItem(start)
+							}
+						}
+						for(let i = 0; i < items.length; i++) {
+							addItem(items[i], proxiedArray.length);
+							let node = nodeIndexed.pop();
+							nodeIndexed.splice(start,0,node);
+							moveNodeAt(node, start+i);
+						}
+						refreshIndex();
+						break;
+					case 'sort' :
+					case 'reverse' :
+					case 'filter' :
+					case 'concat' :
+					case 'slice' :
+						// TODO (rebuild all?)
+						break;
+				}
+			}
+
+		});
+
 	}
 
 	/**
@@ -189,10 +322,68 @@ window.Anvedi = (function () {
 		// we need to keep track of nested objects
 		const proxiesMap  = new Map();
 
+		const getParentsOfObj = obj=> {
+			if(proxiesMap.has(obj)) {
+				return proxiesMap.get(obj).parents.slice(0);
+			}
+			return [];
+		}
+
+		const notifyParents = (obj, value, realKeyChunks, key)=> {
+			// notify all the parents too if there is some listeners
+			let currentParents = [...realKeyChunks, key];
+			while(currentParents.length > 1) {
+				currentParents = currentParents.slice(0,currentParents.length -1);
+				let realKey = currentParents.join(".");
+
+				handlerSets[realKey] && handlerSets[realKey].forEach(callback => {
+					callback(obj, key, value, realKey);
+				});
+			}
+		}
+
 		// the proxy for change listeners
 		let proxy = {
 			get(target, key) {
+
+				if(key === '__anvedi_hack_retrieve_org_target') {
+					return target;
+				}
+
 				let refObj = target[key];
+
+				if(Array.isArray(target)) {
+					let proxyArray = proxiesMap.get(target);
+
+					switch(key) {
+						case 'push' :
+						case 'pop' :
+						case 'splice' :
+						case 'shift' :
+						case 'unshift' :
+						case 'sort' :
+						case 'reverse' :
+						case 'filter' :
+						case 'concat' :
+							return function() {
+								let args = [...arguments];
+								let realKeyChunks = (proxyArray.parents);
+								let realKey       = [...realKeyChunks, key].join(".");
+								// Notify all the listeners for this key that the value is changed
+								handlerSets[realKey] && handlerSets[realKey].forEach(callback => {
+									callback(target, key, {args});
+								});
+								notifyParents(target, {args}, realKeyChunks, key);
+								target[key].call(target, ...args)
+							}
+					}
+				}
+
+				// if the object is already proxied, don't proxy again the object (proxy of proxy)
+				// if(refObj && refObj.__anvedi_hack_retrieve_org_target) {
+					// return refObj;
+				// }
+
 				// for nested object, we have to return a proxy for each child
 				if (typeof refObj === 'object' && refObj !== null) {
 					// if it's the first time that we access this object, we have to create the proxy for it and storing it inside
@@ -200,9 +391,11 @@ window.Anvedi = (function () {
 					if (!proxiesMap.has(refObj)) {
 						proxiesMap.set(refObj, {
 							proxy   : new Proxy(refObj, proxy),
-							parents : []
+							parents : getParentsOfObj(target),
+							isArray: Array.isArray(refObj)
 						});
-						proxiesMap.get(refObj).parents.push(key);
+						let proxyInfo = proxiesMap.get(refObj);
+						proxyInfo.parents.push(key);
 					}
 					return proxiesMap.get(refObj).proxy;
 				}
@@ -211,19 +404,41 @@ window.Anvedi = (function () {
 
 			},
 			set(obj, key, value) {
+
+				if(!Array.isArray(obj) && !obj.hasOwnProperty(key)) {
+					obj[key] = value;
+					return true;
+				}
+
+				if(Array.isArray(obj) && key === "length") {
+					obj[key] = value;
+					return true;
+				}
+
 				// maybe we are inside a child proxy, or maybe not
 				// in case of nested object we have only the last key and the last object.
 				// (i.e. if we're modifiying the user.personalData.email the key here is just "email")
 				// But inside the proxiesMap we have all the parent chain (user,personalData)
 				let realKeyChunks = (proxiesMap.has(obj) ? proxiesMap.get(obj).parents : []);
 				let realKey       = [...realKeyChunks, key].join(".");
+				obj[key] = value;
 
 				// Notify all the listeners for this key that the value is changed
 				handlerSets[realKey] && handlerSets[realKey].forEach(callback => {
 					callback(obj, key, value);
 				});
+				notifyParents(obj, value, realKeyChunks, key);
 
 				// accept the modification inside the proxy
+				return true;
+			},
+			deleteProperty(obj, key) {
+				// console.log({obj,key, type:"delete"})
+				delete obj[key];
+				if(proxiesMap.has(obj)) {
+					let proxyInfo = proxiesMap.get(obj);
+					notifyParents(obj, undefined, proxyInfo.parents, key)
+				}
 				return true;
 			}
 		}
