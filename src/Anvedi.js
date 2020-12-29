@@ -106,7 +106,7 @@ window.Anvedi = (function () {
 			});
 
 			// prepare and fix the origin point for the next match, according to the new node1
-			currentIndex += match[0].length + match.index;
+			currentIndex = match[0].length + match.index;
 			currentNode = node3;
 			if(index === v.length -1) {
 				normalizeEscapedVarOnNode(currentNode);
