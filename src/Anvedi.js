@@ -11,7 +11,7 @@ window.Anvedi = (function () {
 	 * @param arr2
 	 * @returns {*}
 	 */
-	const mergeAndJoinChunks = (arr1, arr2) => arr1.map((v, index) => v + (arr2[index] === undefined? "" : arr2[index])).join("");
+	const mergeAndJoinChunks = (arr1, arr2) => arr1.map((v, index) => v + (arr2[index] === undefined ? "" : arr2[index])).join("");
 
 	/**
 	 * given a complex key string (i.e. "user.name") and a referer object, search the inner key inside the referer object
@@ -23,7 +23,7 @@ window.Anvedi = (function () {
 		let currentObj = obj;
 		complexKey.split(".").forEach(k => {
 			currentObj = currentObj[k];
-			if(currentObj === undefined)
+			if (currentObj === undefined)
 				return undefined;
 		});
 		return currentObj;
@@ -43,9 +43,9 @@ window.Anvedi = (function () {
 	 * @param regexp RegExp
 	 * @returns {{chunks: [], keys: *[], values: []}}
 	 */
-	const chunkizeString = (text, vars, regexp)=> {
-		const chunks  = [];
-		const matches = text.matchAll(regexp);
+	const chunkizeString = (text, vars, regexp) => {
+		const chunks     = [];
+		const matches    = text.matchAll(regexp);
 		let currentIndex = 0;
 		const values     = [];
 		const keys       = [...matches].map(match => {
@@ -59,9 +59,9 @@ window.Anvedi = (function () {
 		return {chunks, keys, values};
 	}
 
-	const normalizeEscapedVarOnNode = node=> {
+	const normalizeEscapedVarOnNode = node => {
 		let chunks = node.nodeValue.split('{\\{');
-		if(chunks.length > 1) {
+		if (chunks.length > 1) {
 			node.nodeValue = chunks.join('{{');
 		}
 	}
@@ -75,8 +75,8 @@ window.Anvedi = (function () {
 	 * @param rootInstance
 	 */
 	function varBindingTextNode(node, vars, handlerSets, rootInstance) {
-		const regexP     = /{{(.*?)}}/g;
-		const matches    = node.nodeValue.matchAll(regexP);
+		const regexP  = /{{(.*?)}}/g;
+		const matches = node.nodeValue.matchAll(regexP);
 		/*
 			for each match, keep track of position and split efficiently the textNode in three or more parts.
 			i.e given the TextNode "Hello {{name}} how are you?", we're going to split it in 3 nodes:
@@ -88,11 +88,11 @@ window.Anvedi = (function () {
         */
 		let currentIndex = 0;
 		let currentNode  = node;
-		[...matches].forEach((match,index,v) => {
+		[...matches].forEach((match, index, v) => {
 			// split here in three parts. The currentNode become node1
-			let node2              = currentNode.splitText(match.index - currentIndex);
-			let node3               = node2.splitText(match[0].length);
-			let keySearched          = match[1];
+			let node2       = currentNode.splitText(match.index - currentIndex);
+			let node3       = node2.splitText(match[0].length);
+			let keySearched = match[1];
 
 			normalizeEscapedVarOnNode(currentNode);
 
@@ -110,15 +110,14 @@ window.Anvedi = (function () {
 
 			// prepare and fix the origin point for the next match, according to the new node1
 			currentIndex = match[0].length + match.index;
-			currentNode = node3;
-			if(index === v.length -1) {
+			currentNode  = node3;
+			if (index === v.length - 1) {
 				normalizeEscapedVarOnNode(currentNode);
 			}
 		});
-		if([...matches].length === 0)
+		if ([...matches].length === 0)
 			normalizeEscapedVarOnNode(node);
 	}
-
 
 
 	/**
@@ -133,13 +132,13 @@ window.Anvedi = (function () {
 	 */
 	function varBindingAttribute(attr, vars, handlerSets) {
 
-		const {chunks, keys, values} = chunkizeString(attr.value, vars,  /{{(.*?)}}/g);
+		const {chunks, keys, values} = chunkizeString(attr.value, vars, /{{(.*?)}}/g);
 		// set current value
-		attr.value = mergeAndJoinChunks(chunks, values);
-		const updateAttribute = (keyIndex, key, value) => {
+		attr.value                   = mergeAndJoinChunks(chunks, values);
+		const updateAttribute        = (keyIndex, key, value) => {
 			// we have to update the current value
 			values[keyIndex] = value;
-			attr.value = mergeAndJoinChunks(chunks, values);
+			attr.value       = mergeAndJoinChunks(chunks, values);
 		};
 
 		// set listeners for further modifications
@@ -153,33 +152,33 @@ window.Anvedi = (function () {
 
 	function varBindingAttributeName(element, varName, vars, handlerSets) {
 		let attrKeyValue = extractValueFromObject(vars, varName);
-		if(!(typeof(attrKeyValue) === 'object')) {
+		if (!(typeof (attrKeyValue) === 'object')) {
 			// console.error("Dynamic attributes must be objects");
-			element.removeAttribute("{{"+varName+"}}");
-			return ;
+			element.removeAttribute("{{" + varName + "}}");
+			return;
 		}
-		element.removeAttribute("{{"+varName+"}}");
+		element.removeAttribute("{{" + varName + "}}");
 
 		let currentObjects = {};
-		for(let i in attrKeyValue) {
-			currentObjects[i] =attrKeyValue;
+		for (let i in attrKeyValue) {
+			currentObjects[i] = attrKeyValue;
 			element.setAttribute(i, attrKeyValue[i]);
-			let fullKey = varName + "." +i;
+			let fullKey          = varName + "." + i;
 			handlerSets[fullKey] = handlerSets[fullKey] || [];
-			handlerSets[fullKey].push((obj, tKey, value)=> {
+			handlerSets[fullKey].push((obj, tKey, value) => {
 				element.setAttribute(tKey, value);
 			});
 		}
 		handlerSets[varName] = handlerSets[varName] || [];
-		handlerSets[varName].push((obj, tKey, value)=> {
+		handlerSets[varName].push((obj, tKey, value) => {
 			element.setAttribute(tKey, value);
 		});
 	}
 
 	function attributeEngineIfAny(element, attr, rootInstance) {
-		if(attr.name.substr(0,9) === "anvedi-on") {
+		if (attr.name.substr(0, 9) === "anvedi-on") {
 			let eventName = attr.name.substr(9);
-			element.addEventListener(eventName, function() {
+			element.addEventListener(eventName, function () {
 				rootInstance.listeners[attr.value].call(rootInstance.getProxy(), element)
 			});
 			return true;
@@ -197,19 +196,19 @@ window.Anvedi = (function () {
 	 */
 	function _varBindingElement(element, vars, handlerSets, rootInstance) {
 
-		if(element.nodeName.toLowerCase() === "template" && element.getAttribute('anvedi-foreach')) {
-			let varName = element.getAttribute('anvedi-foreach');
-			varName = varName.substring(2,varName.length-2);
+		if (element.nodeName.toLowerCase() === "template" && element.getAttribute('anvedi-foreach')) {
+			let varName          = element.getAttribute('anvedi-foreach');
+			varName              = varName.substring(2, varName.length - 2);
 			handlerSets[varName] = handlerSets[varName] || [];
-			engineLists(element,extractValueFromObject(vars, varName), handlerSets[varName], rootInstance);
-			return ;
+			engineLists(element, extractValueFromObject(vars, varName), handlerSets[varName], rootInstance);
+			return;
 		}
 
 		if (element.nodeType !== Node.TEXT_NODE) {
-			if(element.attributes) {
+			if (element.attributes) {
 				for (let i = 0; i < element.attributes.length; i++) {
 					let attr = element.attributes.item(i);
-					if(attributeEngineIfAny(element, attr, rootInstance)) {
+					if (attributeEngineIfAny(element, attr, rootInstance)) {
 						continue;
 					}
 					if (attr.name.match(/^{{.*?}}$/)) {
@@ -232,48 +231,48 @@ window.Anvedi = (function () {
 		varBindingTextNode(element, vars, handlerSets, rootInstance);
 	}
 
-	const moveNodeAt = (node,index) => {
+	const moveNodeAt = (node, index) => {
 		console.log({node})
-		if(+index >= node.parentNode.children.length) {
+		if (+index >= node.parentNode.children.length) {
 			node.parentNode.appendChild(node)
-		}else {
+		} else {
 			node.parentNode.insertBefore(node, node.parentNode.children[+index]);
 		}
 	}
 
 	function engineLists(template, proxiedArray, handlerSet, rootInstance) {
-		let varName = template.getAttribute('anvedi-foreach-to');
+		let varName     = template.getAttribute('anvedi-foreach-to');
 		let nodeIndexed = [];
-		const addItem = (item, index)=> {
+		const addItem   = (item, index) => {
 			let tree = template.content.cloneNode(true);
 			let data = {
-				'%index': index,
-				'%index1': index+1,
-				'%indexmod2' : index%2
+				'%index'     : index,
+				'%index1'    : index + 1,
+				'%indexmod2' : index % 2
 			};
 
 			data[varName] = item;
 			template.parentNode.insertBefore(tree, template);
 			// the fragment is totally replaced (and emptied) by its content. So for fetch the real node
 			// we have to search it in DOM. Warning a fragmetn could be composed by 2 or more siblings (TODO)
-			let newNode = template.previousElementSibling;
+			let newNode        = template.previousElementSibling;
 			nodeIndexed[index] = newNode;
-			let anvediInstance = new Anvedi(newNode, {data, listeners:rootInstance.listeners}, rootInstance);
-			newNode.__anvedi = {instance:anvediInstance,index};
+			let anvediInstance = new Anvedi(newNode, {data, listeners : rootInstance.listeners}, rootInstance);
+			newNode.__anvedi   = {instance : anvediInstance, index};
 		}
 
 		const removeItem = (index) => {
 			let node = nodeIndexed[index];
 			node.parentNode.removeChild(node);
-			nodeIndexed.splice(index,1);
+			nodeIndexed.splice(index, 1);
 		}
 
-		const refreshIndex = ()=> {
-			nodeIndexed.forEach((node,index)=> {
-				let data = node.__anvedi.instance.getProxy();
-				data['%index'] = index;
-				data['%index1'] = index+1;
-				data['%indexmod2'] = index%2;
+		const refreshIndex = () => {
+			nodeIndexed.forEach((node, index) => {
+				let data           = node.__anvedi.instance.getProxy();
+				data['%index']     = index;
+				data['%index1']    = index + 1;
+				data['%indexmod2'] = index % 2;
 			});
 		}
 
@@ -282,21 +281,21 @@ window.Anvedi = (function () {
 		});
 
 		handlerSet.push((obj, key, value) => {
-			if(obj === proxiedArray) {
-				switch(key) {
+			if (obj === proxiedArray) {
+				switch (key) {
 					case 'push' :
 						addItem(value.args[0], proxiedArray.length);
 						break;
 					case 'unshift' :
 						addItem(value.args[0], proxiedArray.length);
-						let node = nodeIndexed.splice(nodeIndexed.length-1,1);
-						node = node[0];
+						let node = nodeIndexed.splice(nodeIndexed.length - 1, 1);
+						node     = node[0];
 						nodeIndexed.unshift(node);
 						moveNodeAt(node, 0)
 						refreshIndex();
 						break;
 					case 'pop' :
-						removeItem(proxiedArray.length-1);
+						removeItem(proxiedArray.length - 1);
 						break;
 					case 'shift' :
 						removeItem(0);
@@ -304,16 +303,16 @@ window.Anvedi = (function () {
 						break;
 					case 'splice' :
 						let [start, dels, ...items] = value.args;
-						if(dels > 0) {
-							for(let i = 0; i < dels; i++) {
+						if (dels > 0) {
+							for (let i = 0; i < dels; i++) {
 								removeItem(start)
 							}
 						}
-						for(let i = 0; i < items.length; i++) {
+						for (let i = 0; i < items.length; i++) {
 							addItem(items[i], proxiedArray.length);
 							let node = nodeIndexed.pop();
-							nodeIndexed.splice(start,0,node);
-							moveNodeAt(node, start+i);
+							nodeIndexed.splice(start, 0, node);
+							moveNodeAt(node, start + i);
 						}
 						refreshIndex();
 						break;
@@ -342,9 +341,9 @@ window.Anvedi = (function () {
 	 * @constructor
 	 */
 	function Anvedi(element, params, parentInstance) {
-		let defaults = params.data;
-		this.listeners = params.listeners || {};
-		this.unproxiedData = defaults;
+		let defaults        = params.data;
+		this.listeners      = params.listeners || {};
+		this.unproxiedData  = defaults;
 		this.parentInstance = parentInstance || null;
 
 		// a list of all listeners to all dynamic values in defaults
@@ -352,8 +351,8 @@ window.Anvedi = (function () {
 		// we need to keep track of nested objects
 		const proxiesMap  = new Map();
 
-		const getParentsOfObj = obj=> {
-			if(proxiesMap.has(obj)) {
+		const getParentsOfObj = obj => {
+			if (proxiesMap.has(obj)) {
 				return proxiesMap.get(obj).parents.slice(0);
 			}
 			return [];
@@ -361,12 +360,12 @@ window.Anvedi = (function () {
 
 		let rootInstance = this;
 
-		const notifyParents = (obj, value, realKeyChunks, key, parentInstance)=> {
+		const notifyParents = (obj, value, realKeyChunks, key, parentInstance) => {
 			// notify all the parents too if there is some listeners
 			let currentParents = [...realKeyChunks, key];
-			while(currentParents.length > 1) {
-				currentParents = currentParents.slice(0,currentParents.length -1);
-				let realKey = currentParents.join(".");
+			while (currentParents.length > 1) {
+				currentParents = currentParents.slice(0, currentParents.length - 1);
+				let realKey    = currentParents.join(".");
 
 				handlerSets[realKey] && handlerSets[realKey].forEach(callback => {
 					callback(obj, key, value, realKey);
@@ -375,17 +374,17 @@ window.Anvedi = (function () {
 		}
 
 		// the proxy for change listeners
-		let proxy = {
+		let proxy        = {
 			get(target, key) {
-				if(key === '__orgTarget') {
+				if (key === '__orgTarget') {
 					return target;
 				}
 				let refObj = target[key];
 
-				if(Array.isArray(target)) {
+				if (Array.isArray(target)) {
 					let proxyArray = proxiesMap.get(target);
 
-					switch(key) {
+					switch (key) {
 						case 'push' :
 						case 'pop' :
 						case 'splice' :
@@ -395,7 +394,7 @@ window.Anvedi = (function () {
 						case 'reverse' :
 						case 'filter' :
 						case 'concat' :
-							return function() {
+							return function () {
 								let args = [...arguments];
 								rootInstance.notifyChanges(target, key, {args});
 								target[key].call(target, ...args)
@@ -411,7 +410,7 @@ window.Anvedi = (function () {
 						proxiesMap.set(refObj, {
 							proxy   : new Proxy(refObj, proxy),
 							parents : getParentsOfObj(target),
-							isArray: Array.isArray(refObj)
+							isArray : Array.isArray(refObj)
 						});
 						let proxyInfo = proxiesMap.get(refObj);
 						proxyInfo.parents.push(key);
@@ -424,12 +423,12 @@ window.Anvedi = (function () {
 			},
 			set(obj, key, value) {
 
-				if(!Array.isArray(obj) && !obj.hasOwnProperty(key)) {
+				if (!Array.isArray(obj) && !obj.hasOwnProperty(key)) {
 					obj[key] = value;
 					return true;
 				}
 
-				if(Array.isArray(obj) && key === "length") {
+				if (Array.isArray(obj) && key === "length") {
 					obj[key] = value;
 					return true;
 				}
@@ -444,7 +443,7 @@ window.Anvedi = (function () {
 			deleteProperty(obj, key) {
 				// console.log({obj,key, type:"delete"})
 				delete obj[key];
-				if(proxiesMap.has(obj)) {
+				if (proxiesMap.has(obj)) {
 					let proxyInfo = proxiesMap.get(obj);
 					notifyParents(obj, undefined, proxyInfo.parents, key, parentInstance)
 				}
@@ -454,9 +453,9 @@ window.Anvedi = (function () {
 		// proxying the defualts data
 		this.proxiedData = new Proxy(defaults, proxy);
 		// inherit vars from the parent
-		if(parentInstance) {
-			for(let varName in parentInstance.unproxiedData) {
-				if(!defaults.hasOwnProperty(varName)) {
+		if (parentInstance) {
+			for (let varName in parentInstance.unproxiedData) {
+				if (!defaults.hasOwnProperty(varName)) {
 					this.proxiedData[varName] = parentInstance.proxiedData[varName].__orgTarget;
 				}
 			}
@@ -467,9 +466,9 @@ window.Anvedi = (function () {
 		_varBindingElement(element, defaults, handlerSets, rootInstance);
 
 		// add listeners for parent
-		if(parentInstance) {
+		if (parentInstance) {
 			for (let i in handlerSets) {
-				handlerSets[i].forEach(cbk=>{
+				handlerSets[i].forEach(cbk => {
 					parentInstance.handlerSets[i] && parentInstance.handlerSets[i].push(cbk);
 				})
 
@@ -480,7 +479,7 @@ window.Anvedi = (function () {
 		// in case of nested object we have only the last key and the last object.
 		// (i.e. if we're modifiying the user.personalData.email the key here is just "email")
 		// But inside the proxiesMap we have all the parent chain (user,personalData)
-		this.notifyChanges = function(obj, key, value) {
+		this.notifyChanges = function (obj, key, value) {
 			let realKeyChunks = (proxiesMap.has(obj) ? proxiesMap.get(obj).parents : []);
 			let realKey       = [...realKeyChunks, key].join(".");
 			// Notify all the listeners for this key that the value is changed
@@ -493,7 +492,8 @@ window.Anvedi = (function () {
 		// return the proxy. Any modification inside this object will notify the application
 		// return proxiedData;
 	}
-	Anvedi.prototype.getProxy = function() {
+
+	Anvedi.prototype.getProxy = function () {
 		return this.proxiedData;
 	}
 	return Anvedi;
