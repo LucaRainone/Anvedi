@@ -6,7 +6,7 @@ React in pure JavaScript. Please don't use it in production but feel free to rea
 How it works. Here some example:
 
 ## basic sample
-
+![](docs/gifs/sample.gif)
 ```
 <!--demo/sample.html-->
 <div id="app">
@@ -29,7 +29,7 @@ How it works. Here some example:
 ```
 
 ## Listener sample
-
+![](docs/gifs/listeners.gif)
 ```
 <!--demo/listeners.html-->
 <div id="app">
@@ -56,7 +56,7 @@ How it works. Here some example:
 ```
 
 ## List sample
-
+![](docs/gifs/list.gif)
 ```
 <div id="app">
     <label>
