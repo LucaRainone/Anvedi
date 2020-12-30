@@ -152,9 +152,10 @@ window.Anvedi = (function () {
 	}
 
 	function varBindingAttributeName(element, varName, vars, handlerSets) {
-		let attrKeyValue = vars[varName];
+		let attrKeyValue = extractValueFromObject(vars, varName);
 		if(!(typeof(attrKeyValue) === 'object')) {
-			console.error("Dynamic attributes must be objects");
+			// console.error("Dynamic attributes must be objects");
+			element.removeAttribute("{{"+varName+"}}");
 			return ;
 		}
 		element.removeAttribute("{{"+varName+"}}");
@@ -246,7 +247,8 @@ window.Anvedi = (function () {
 		const addItem = (item, index)=> {
 			let tree = template.content.cloneNode(true);
 			let data = {
-				'%index': index
+				'%index': index,
+				'%index1': index+1,
 			};
 			data[varName] = item;
 			template.parentNode.insertBefore(tree, template);
@@ -268,6 +270,7 @@ window.Anvedi = (function () {
 			nodeIndexed.forEach((node,index)=> {
 				let data = node.__anvedi.instance.getProxy();
 				data['%index'] = index;
+				data['%index1'] = index+1;
 			});
 		}
 
