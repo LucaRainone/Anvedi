@@ -1,0 +1,15 @@
+{
+  "name": "anvedi",
+  "version": "0.0.1",
+  "description": "This is an experiment to try to reproduce and understand the basics of the most populars library/frameworks like Vue or React in pure JavaScript. Please don't use it in production but feel free to read, understand and improve it.",
+  "main": "src/Anvedi.js",
+  "scripts": {
+    "build": "uglifyjs --compress --mangle -o dist/Anvedi.min.js -- ./src/Anvedi.js"
+  },
+  "author": "Luca Rainone",
+  "license": "MIT",
+  "devDependencies": {
+    "uglify-es": "^3.3.9"
+  },
+  "dependencies": {}
+}
