@@ -5,124 +5,31 @@
     <meta name="viewport"
           content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Anvedi TODO app demo</title>
+    <title>Anvedi examples</title>
     <script type="text/javascript" src="../src/Anvedi.js"></script>
-    <style>
-        .closeX {
 
-            display:inline-block;
-            font-size: 9px;
-            font-style:italic;
-            cursor:pointer;
-            color:red;
-            float:right;
-        }
-        .row0 {
-            background-color: #ddd;
-        }
-        .row1 {
-            background-color: #fafafa;
-        }
-        .todolist li {
-            padding: 10px;
-            list-style-type: none;
-            list-style-position: inside;
-        }
-    </style>
 </head>
 <body>
-    <div id="app">
-        <h3>Now is {{now}}</h3>
-        <label {{labelattributes}}>Add your todo <input type="text" name="todo" value="" id="inputtodo"> <button id="insertTodo" type="button">Insert</button></label>
-        <button type="button" id="buttonDelFirst">Delete the first</button>
-        <button type="button" id="buttonDelMiddle">Delete the middle</button>
-        <button type="button" id="buttonDelLast">Delete the last</button>
-        <ul class="todolist">
-            <template anvedi-foreach="{{todolist}}" anvedi-foreach-to="item">
-                <li class="todo row{{%indexmod2}}" title="inserted on {{item.insertTime}}" {{item.listattributes}}>
-                   {{%index1}}) {{item.text}} <span class="closeX" anvedi-onclick="remove">[delete]</span>
-                </li>
-            </template>
-        </ul>
-    </div>
+<h1>
+    Examples
+</h1>
 
-
-
+<ul id="examples">
+    <template anvedi-foreach="{{examples}}" anvedi-foreach-to="example">
+        <li><a href="./{{example.name}}.html">{{example.name}}</a></li>
+    </template>
+</ul>
 <script>
-
-    const getElement = selector=>document.querySelector(selector);
-    const getRandomColor = ()=> "#"+((1<<24)*Math.random()|0).toString(16);
-    const app = new Anvedi(getElement("#app"), {
+    new Anvedi(document.getElementById("examples"), {
     	data: {
-    		todolist:[
-            ],
-            now: new Date(),
-		    labelattributes: {
-    			style:"color: green",
-
-            }
-        },
-        listeners: {
-    		remove(element) {
-			    data.todolist.splice(this['%index'],1)
-            }
+    		examples: [
+                {name:'sample'},
+                {name:'listeners'},
+                {name:'list'},
+                {name:'todoapp'},
+            ]
         }
-    });
-    const data = app.getProxy();
-
-
-
-    const addItem = ({text})=> {
-        data.todolist.push(
-        	{
-                text,
-                insertTime:new Date(),
-		        listattributes: {
-        	        style: "color: " + getRandomColor()
-                }
-        	}
-        );
-    };
-
-    const insertCurrentTodo = ()=> {
-	    const inputElement = getElement("#inputtodo");
-	    const text = inputElement.value;
-	    if(text) {
-		    addItem({text});
-	    }
-    }
-
-    const resetInputField = ()=>  getElement("#inputtodo").value = "";
-
-    getElement("#inputtodo").addEventListener('keyup', function(e) {
-    	if(e.code === 'Enter' || e.keyCode === 13) {
-		    insertCurrentTodo();
-		    resetInputField();
-	    }
-    });
-
-    getElement('#insertTodo').addEventListener('click', function() {
-	    insertCurrentTodo();
-    });
-
-    getElement('#buttonDelFirst').addEventListener('click', function() {
-	    data.todolist.shift();
-    });
-    getElement('#buttonDelLast').addEventListener('click', function() {
-	    data.todolist.pop();
-    });
-    getElement('#buttonDelMiddle').addEventListener('click', function() {
-    	let len = data.todolist.length;
-	    if(len > 2) {
-	    	data.todolist.splice(Math.floor(len/2),len%2? 1 : 2)
-        }
-    });
-
-    (function updateTime() {
-	    data.now = new Date()
-	    setTimeout(updateTime, 1000);
-    })();
-
+    })
 </script>
 
 </body>
