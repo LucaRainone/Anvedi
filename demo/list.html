@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Anvedi list demo</title>
+    <script type="text/javascript" src="../src/Anvedi.js"></script>
+</head>
+<body>
+<div id="app">
+    <label>
+        Insert your name
+        <input type="text" placeholder="John Doe" value="" id="inputName">
+    </label>
+    <br><br>
+    TODO list of {{name}}
+    <ul>
+        <template anvedi-foreach="{{todos}}" anvedi-foreach-to="todo">
+            <li>asd {{todo.text}} (to do by {{name}}) </li>
+        </template>
+    </ul>
+
+    <button type="button" id="execPush" anvedi-onclick="addATodo">exec a data.todos.push({text: "Another todo"})</button>
+</div>
+<script>
+    const inputName = document.getElementById("inputName");
+	const app = new Anvedi(document.getElementById("app"), {
+		data: {
+			now: new Date(),
+            name: "unknown",
+            todos: [
+                {text: "Todo 1"},
+                {text: "Todo 2"},
+                {text: "Todo 3"},
+            ]
+		},
+        listeners: {
+	        addATodo() {
+	        	data.todos.push({text:"Another todo"})
+            }
+        }
+	});
+	const data = app.getProxy();
+
+    inputName.addEventListener('keyup', function() {
+		data.name = this.value;
+    });
+
+
+</script>
+</body>
+</html>
