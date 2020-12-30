@@ -249,7 +249,9 @@ window.Anvedi = (function () {
 			let data = {
 				'%index': index,
 				'%index1': index+1,
+				'%indexmod2' : index%2
 			};
+
 			data[varName] = item;
 			template.parentNode.insertBefore(tree, template);
 			// the fragment is totally replaced (and emptied) by its content. So for fetch the real node
@@ -271,6 +273,7 @@ window.Anvedi = (function () {
 				let data = node.__anvedi.instance.getProxy();
 				data['%index'] = index;
 				data['%index1'] = index+1;
+				data['%indexmod2'] = index%2;
 			});
 		}
 
