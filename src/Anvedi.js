@@ -23,6 +23,8 @@ window.Anvedi = (function () {
 		let currentObj = obj;
 		complexKey.split(".").forEach(k => {
 			currentObj = currentObj[k];
+			if(currentObj === undefined)
+				return undefined;
 		});
 		return currentObj;
 	}
@@ -70,8 +72,9 @@ window.Anvedi = (function () {
 	 * @param node
 	 * @param vars
 	 * @param handlerSets
+	 * @param rootInstance
 	 */
-	function varBindingTextNode(node, vars, handlerSets) {
+	function varBindingTextNode(node, vars, handlerSets, rootInstance) {
 		const regexP     = /{{(.*?)}}/g;
 		const matches    = node.nodeValue.matchAll(regexP);
 		/*
@@ -172,26 +175,42 @@ window.Anvedi = (function () {
 		});
 	}
 
+	function attributeEngineIfAny(element, attr, rootInstance) {
+		if(attr.name.substr(0,9) === "anvedi-on") {
+			let eventName = attr.name.substr(9);
+			element.addEventListener(eventName, function() {
+				rootInstance.listeners[attr.value].call(rootInstance.getProxy(), element)
+			});
+			return true;
+		}
+	}
+
 	/**
 	 * recursive function for exploring DOM searching variables
 	 * The more little is the component, the more efficient is the exploring
 	 * @param element
 	 * @param vars
 	 * @param handlerSets
+	 * @param rootInstance
 	 * @private
 	 */
-	function _varBindingElement(element, vars, handlerSets) {
-		if(element.nodeName.toLowerCase() === "template" && element.getAttribute('data-foreach')) {
-			let varName = element.getAttribute('data-foreach');
+	function _varBindingElement(element, vars, handlerSets, rootInstance) {
+
+		if(element.nodeName.toLowerCase() === "template" && element.getAttribute('anvedi-foreach')) {
+			let varName = element.getAttribute('anvedi-foreach');
 			varName = varName.substring(2,varName.length-2);
 			handlerSets[varName] = handlerSets[varName] || [];
-			engineLists(element,extractValueFromObject(vars, varName), handlerSets[varName]);
+			engineLists(element,extractValueFromObject(vars, varName), handlerSets[varName], rootInstance);
 			return ;
 		}
+
 		if (element.nodeType !== Node.TEXT_NODE) {
 			if(element.attributes) {
 				for (let i = 0; i < element.attributes.length; i++) {
 					let attr = element.attributes.item(i);
+					if(attributeEngineIfAny(element, attr, rootInstance)) {
+						continue;
+					}
 					if (attr.name.match(/^{{.*?}}$/)) {
 						varBindingAttributeName(element, attr.name.substr(2, attr.name.length - 4), vars, handlerSets);
 						continue;
@@ -205,11 +224,11 @@ window.Anvedi = (function () {
 			let childNodes = [...element.childNodes].slice(0);
 			childNodes.forEach(node => {
 				// console.log({node,l:childNodes.length});
-				_varBindingElement(node, vars, handlerSets);
+				_varBindingElement(node, vars, handlerSets, rootInstance);
 			});
 			return;
 		}
-		varBindingTextNode(element, vars, handlerSets);
+		varBindingTextNode(element, vars, handlerSets, rootInstance);
 	}
 
 	const moveNodeAt = (node,index) => {
@@ -221,8 +240,8 @@ window.Anvedi = (function () {
 		}
 	}
 
-	function engineLists(template, proxiedArray, handlerSet) {
-		let varName = template.getAttribute('data-foreach-to');
+	function engineLists(template, proxiedArray, handlerSet, rootInstance) {
+		let varName = template.getAttribute('anvedi-foreach-to');
 		let nodeIndexed = [];
 		const addItem = (item, index)=> {
 			let tree = template.content.cloneNode(true);
@@ -235,7 +254,7 @@ window.Anvedi = (function () {
 			// we have to search it in DOM. Warning a fragmetn could be composed by 2 or more siblings (TODO)
 			let newNode = template.previousElementSibling;
 			nodeIndexed[index] = newNode;
-			let anvediInstance = new Anvedi(newNode, data, varName);
+			let anvediInstance = new Anvedi(newNode, {data, listeners:rootInstance.listeners}, rootInstance);
 			newNode.__anvedi = {instance:anvediInstance,index};
 		}
 
@@ -311,11 +330,16 @@ window.Anvedi = (function () {
 	 * here we go. Given the main HTMLElement element and an object of all defaults values, it happens the magic!
 	 *
 	 * @param element HTMLElement
-	 * @param defaults Object
+	 * @param params Object
+	 * @param parentInstance Anvedi|null
 	 * @return Object Proxied data
 	 * @constructor
 	 */
-	function Anvedi(element, defaults) {
+	function Anvedi(element, params, parentInstance) {
+		let defaults = params.data;
+		this.listeners = params.listeners || {};
+		this.unproxiedData = defaults;
+		this.parentInstance = parentInstance || null;
 
 		// a list of all listeners to all dynamic values in defaults
 		const handlerSets = {};
@@ -329,7 +353,9 @@ window.Anvedi = (function () {
 			return [];
 		}
 
-		const notifyParents = (obj, value, realKeyChunks, key)=> {
+		let rootInstance = this;
+
+		const notifyParents = (obj, value, realKeyChunks, key, parentInstance)=> {
 			// notify all the parents too if there is some listeners
 			let currentParents = [...realKeyChunks, key];
 			while(currentParents.length > 1) {
@@ -345,11 +371,9 @@ window.Anvedi = (function () {
 		// the proxy for change listeners
 		let proxy = {
 			get(target, key) {
-
-				if(key === '__anvedi_hack_retrieve_org_target') {
+				if(key === '__orgTarget') {
 					return target;
 				}
-
 				let refObj = target[key];
 
 				if(Array.isArray(target)) {
@@ -367,22 +391,11 @@ window.Anvedi = (function () {
 						case 'concat' :
 							return function() {
 								let args = [...arguments];
-								let realKeyChunks = (proxyArray.parents);
-								let realKey       = [...realKeyChunks, key].join(".");
-								// Notify all the listeners for this key that the value is changed
-								handlerSets[realKey] && handlerSets[realKey].forEach(callback => {
-									callback(target, key, {args});
-								});
-								notifyParents(target, {args}, realKeyChunks, key);
+								rootInstance.notifyChanges(target, key, {args});
 								target[key].call(target, ...args)
 							}
 					}
 				}
-
-				// if the object is already proxied, don't proxy again the object (proxy of proxy)
-				// if(refObj && refObj.__anvedi_hack_retrieve_org_target) {
-					// return refObj;
-				// }
 
 				// for nested object, we have to return a proxy for each child
 				if (typeof refObj === 'object' && refObj !== null) {
@@ -415,19 +428,9 @@ window.Anvedi = (function () {
 					return true;
 				}
 
-				// maybe we are inside a child proxy, or maybe not
-				// in case of nested object we have only the last key and the last object.
-				// (i.e. if we're modifiying the user.personalData.email the key here is just "email")
-				// But inside the proxiesMap we have all the parent chain (user,personalData)
-				let realKeyChunks = (proxiesMap.has(obj) ? proxiesMap.get(obj).parents : []);
-				let realKey       = [...realKeyChunks, key].join(".");
 				obj[key] = value;
 
-				// Notify all the listeners for this key that the value is changed
-				handlerSets[realKey] && handlerSets[realKey].forEach(callback => {
-					callback(obj, key, value);
-				});
-				notifyParents(obj, value, realKeyChunks, key);
+				rootInstance.notifyChanges(obj, key, value);
 
 				// accept the modification inside the proxy
 				return true;
@@ -437,18 +440,49 @@ window.Anvedi = (function () {
 				delete obj[key];
 				if(proxiesMap.has(obj)) {
 					let proxyInfo = proxiesMap.get(obj);
-					notifyParents(obj, undefined, proxyInfo.parents, key)
+					notifyParents(obj, undefined, proxyInfo.parents, key, parentInstance)
 				}
 				return true;
 			}
 		}
 		// proxying the defualts data
-		let proxiedData = new Proxy(defaults, proxy);
+		this.proxiedData = new Proxy(defaults, proxy);
+		// inherit vars from the parent
+		if(parentInstance) {
+			for(let varName in parentInstance.unproxiedData) {
+				if(!defaults.hasOwnProperty(varName)) {
+					this.proxiedData[varName] = parentInstance.proxiedData[varName].__orgTarget;
+				}
+			}
+		}
+		this.handlerSets = handlerSets;
 
 		// search references of variables inside the elements and fill the collection of listeners
-		_varBindingElement(element, defaults, handlerSets);
+		_varBindingElement(element, defaults, handlerSets, rootInstance);
 
-		this.proxiedData = proxiedData;
+		// add listeners for parent
+		if(parentInstance) {
+			for (let i in handlerSets) {
+				handlerSets[i].forEach(cbk=>{
+					parentInstance.handlerSets[i] && parentInstance.handlerSets[i].push(cbk);
+				})
+
+			}
+		}
+
+		// maybe we are inside a child proxy, or maybe not
+		// in case of nested object we have only the last key and the last object.
+		// (i.e. if we're modifiying the user.personalData.email the key here is just "email")
+		// But inside the proxiesMap we have all the parent chain (user,personalData)
+		this.notifyChanges = function(obj, key, value) {
+			let realKeyChunks = (proxiesMap.has(obj) ? proxiesMap.get(obj).parents : []);
+			let realKey       = [...realKeyChunks, key].join(".");
+			// Notify all the listeners for this key that the value is changed
+			handlerSets[realKey] && handlerSets[realKey].forEach(callback => {
+				callback(obj, key, value);
+			});
+			notifyParents(obj, value, realKeyChunks, key, parentInstance);
+		}
 
 		// return the proxy. Any modification inside this object will notify the application
 		// return proxiedData;
